@@ -27,7 +27,6 @@
 //! let n: u64 = 10_000_000;
 //! for i in 1..n {
 //!     let (x, y): (f64, f64) = rng.gen();
-//!     let (x, y) = (x * 2.0 - 1.0, y * 2.0 - 1.0);
 //!     if x * x + y * y <= 1.0 {
 //!         in_circle += 1;
 //!     }
@@ -58,7 +57,6 @@
 //!     .enumerate()
 //! {
 //!     let (x, y): (f64, f64) = rng.gen();
-//!     let (x, y) = (x * 2.0 - 1.0, y * 2.0 - 1.0);
 //!     if x * x + y * y <= 1.0 {
 //!         in_circle += 1;
 //!     }
