@@ -92,14 +92,15 @@ pub struct Observer {
 
 /// Optional parameters for creating a new progress observer.
 pub struct Options {
-    /// The checkpoint size represents the number of ticks until the next progress update is emitted.
+    /// Number of ticks before sending the first report.
     ///
-    /// It is adjusted automatically each printout based on the duration of the work performed, and thus it is
-    /// typically not necessary to set manually; the default starting checkpoint size of 1 is sufficient for almost any workload,
-    /// and the checkpoint size will adjust automatically within 1-3 prints to adapt to the workload you're performing.
-    /// Specify only if you both have a strong estimate for how many iterations will pass within the timeframe of your
-    /// specified frequency target, *and* you actually care about the frequency of those first couple printouts.
-    pub checkpoint_size: u64,
+    /// Typically not necessary to set manually; the default starting checkpoint size of 1 should be sufficient for most workloads,
+    /// and the checkpoint size should adjust automatically within 1-3 prints to adapt to the workload you're performing.
+    /// In some cases, if the initial iterations have a moderately chaotic execution time, setting this value higher than 1
+    /// will prevent the first checkpoint estimate from being excessively large.
+    /// Specify if you have a general estimate for how many iterations will pass within the timeframe of your
+    /// specified frequency target.
+    pub first_checkpoint: u64,
 
     /// Specify a maximum number of ticks to wait for in between observations.
     ///
@@ -120,7 +121,7 @@ pub struct Options {
 impl Default for Options {
     fn default() -> Self {
         Self {
-            checkpoint_size: 1,
+            first_checkpoint: 1,
             max_checkpoint_size: None,
             delay: 0,
         }
@@ -166,7 +167,7 @@ impl Observer {
     pub fn new_with(
         frequency_target: Duration,
         Options {
-            checkpoint_size,
+            first_checkpoint: checkpoint_size,
             max_checkpoint_size,
             delay,
         }: Options,
