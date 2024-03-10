@@ -12,6 +12,7 @@
 //!
 //! ```
 //! use std::time::Duration;
+//! use std::io::{stdout, Write};
 //! use progress_observer::prelude::*;
 //! use rand::prelude::*;
 //!
@@ -31,14 +32,16 @@
 //!         in_circle += 1;
 //!     }
 //!     if observer.tick() {
-//!         println!("{}", pi(i, in_circle));
+//!         print!("\rpi = {}", pi(i, in_circle));
+//!         stdout().flush().unwrap();
 //!     }
 //! }
-//! println!("{}", pi(n, in_circle))
+//! println!("pi = {}", pi(n, in_circle))
 //! ```
 //!
 //! ```
 //! use std::time::Duration;
+//! use std::io::{stdout, Write};
 //! use progress_observer::prelude::*;
 //! use rand::prelude::*;
 //!
@@ -61,10 +64,11 @@
 //!         in_circle += 1;
 //!     }
 //!     if should_print {
-//!         println!("{}", pi(i, in_circle));
+//!         print!("\rpi = {}", pi(i, in_circle));
+//!         stdout().flush().unwrap();
 //!     }
 //! }
-//! println!("{}", pi(n, in_circle))
+//! println!("pi = {}", pi(n, in_circle))
 //! ```
 #![feature(div_duration)]
 use std::time::{Duration, Instant};
