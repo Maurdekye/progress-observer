@@ -12,13 +12,14 @@ However, the observer's operation is largely resilient to even a moderate amount
 
 ```rs
 use std::time::Duration;
+use std::io::{stdout, Write};
 use progress_observer::prelude::*;
 use rand::prelude::*;
 
 // compute pi by generating random points within a square, and checking if they fall within a circle
 
 fn pi(total: u64, in_circle: u64) -> f64 {
-    ((total as f64) / (in_circle as f64)) * 4.0
+    in_circle as f64 / total as f64 * 4.0
 }
 
 let mut rng = thread_rng();
@@ -27,26 +28,27 @@ let mut observer = Observer::new(Duration::from_secs_f64(0.5));
 let n: u64 = 10_000_000;
 for i in 1..n {
     let (x, y): (f64, f64) = rng.gen();
-    let (x, y) = (x * 2.0 - 1.0, y * 2.0 - 1.0);
     if x * x + y * y <= 1.0 {
         in_circle += 1;
     }
     if observer.tick() {
-        println!("{}", pi(i, in_circle));
+        print!("\rpi = {}", pi(i, in_circle));
+        stdout().flush().unwrap();
     }
 }
-println!("{}", pi(n, in_circle))
+println!("pi = {}", pi(n, in_circle))
 ```
 
 ```rs
 use std::time::Duration;
+use std::io::{stdout, Write};
 use progress_observer::prelude::*;
 use rand::prelude::*;
 
 // use the observer as an iterator
 
 fn pi(total: usize, in_circle: u64) -> f64 {
-    ((total as f64) / (in_circle as f64)) * 4.0
+    in_circle as f64 / total as f64 * 4.0
 }
 
 let mut rng = thread_rng();
@@ -58,13 +60,13 @@ for (i, should_print) in
     .enumerate()
 {
     let (x, y): (f64, f64) = rng.gen();
-    let (x, y) = (x * 2.0 - 1.0, y * 2.0 - 1.0);
     if x * x + y * y <= 1.0 {
         in_circle += 1;
     }
     if should_print {
-        println!("{}", pi(i, in_circle));
+        print!("\rpi = {}", pi(i, in_circle));
+        stdout().flush().unwrap();
     }
 }
-println!("{}", pi(n, in_circle))
+println!("pi = {}", pi(n, in_circle))
 ```
