@@ -84,6 +84,7 @@ pub struct Observer {
     checkpoint_size: u64,
     max_checkpoint_size: Option<u64>,
     delay: u64,
+    max_scale_factor: f64,
 
     next_checkpoint: u64,
     last_observation: Instant,
@@ -97,7 +98,8 @@ pub struct Options {
     /// Typically not necessary to set manually; the default starting checkpoint size of 1 should be sufficient for most workloads,
     /// and the checkpoint size should adjust automatically within 1-3 prints to adapt to the workload you're performing.
     /// In some cases, if the initial iterations have a moderately chaotic execution time, setting this value higher than 1
-    /// will prevent the first checkpoint estimate from being excessively large.
+    /// will prevent the first checkpoint estimate from being excessively large. If the reporter seems to fail to work
+    /// properly using the default settings, adjust this value up as a first fix.
     /// Specify if you have a general estimate for how many iterations will pass within the timeframe of your
     /// specified frequency target.
     pub first_checkpoint: u64,
@@ -116,6 +118,12 @@ pub struct Options {
     /// longer to process than all subsequent ones. This may throw off the checkpoint estimation. Specify this
     /// argument to ignore the first n ticks processed, only beginning to record progress after they have elapsed.
     pub delay: u64,
+
+    /// Maximum factor that subsequent checkpoints are allowed to increase in size by.
+    ///
+    /// Intended to prevent sudden large jumps in checkpoint size between reports. The default value of 2 is generally fine for most cases.
+    /// Panics if the factor is set less than 1.
+    pub max_scale_factor: f64,
 }
 
 impl Default for Options {
@@ -124,6 +132,7 @@ impl Default for Options {
             first_checkpoint: 1,
             max_checkpoint_size: None,
             delay: 0,
+            max_scale_factor: 2.0,
         }
     }
 }
@@ -151,7 +160,7 @@ impl Observer {
     /// for (n, should_print) in
     ///     Observer::new_with(Duration::from_secs(1), Options {
     ///         max_checkpoint_size: Some(200_000),
-    ///         ..Options::default()
+    ///         ..Default::default()
     ///     })
     ///     .take(10_000_000)
     ///     .enumerate()
@@ -170,13 +179,20 @@ impl Observer {
             first_checkpoint: checkpoint_size,
             max_checkpoint_size,
             delay,
+            max_scale_factor,
         }: Options,
     ) -> Self {
+        if max_scale_factor < 1.0 {
+            panic!("max_scale_factor of {max_scale_factor} is less than 1.0");
+        }
         Self {
             frequency_target,
+
             checkpoint_size,
             max_checkpoint_size,
             delay,
+            max_scale_factor,
+
             next_checkpoint: checkpoint_size,
             last_observation: Instant::now(),
             ticks: 0,
@@ -263,8 +279,9 @@ impl Observer {
             let observation_time = Instant::now();
             let time_since_observation = observation_time.duration_since(self.last_observation);
             let checkpoint_ratio = time_since_observation.div_duration_f64(self.frequency_target);
-            self.checkpoint_size =
-                (((self.checkpoint_size as f64) / checkpoint_ratio) as u64).max(1);
+            self.checkpoint_size = (((self.checkpoint_size as f64) / checkpoint_ratio) as u64)
+                .max(1)
+                .min((self.checkpoint_size as f64 * self.max_scale_factor) as u64);
             if let Some(max_size) = self.max_checkpoint_size {
                 self.checkpoint_size = self.checkpoint_size.min(max_size);
             }
@@ -332,7 +349,10 @@ mod tests {
                 delay: 5,
                 ..Default::default()
             },
-        ).enumerate().take(10) {
+        )
+        .enumerate()
+        .take(10)
+        {
             println!("{i}: {should_print}");
         }
     }

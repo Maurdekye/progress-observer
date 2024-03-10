@@ -1,6 +1,6 @@
 [package]
 name = "progress-observer"
-version = "2.2.0"
+version = "3.0.0"
 edition = "2021"
 description = "Simple utility for scheduling efficient regular progress updates synchronously on long running, singlethreaded tasks."
 license = "MIT"
