@@ -317,3 +317,22 @@ impl Iterator for Observer {
         Some(self.tick())
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn delay() {
+        for (i, should_print) in Observer::new_with(
+            Duration::from_secs(1),
+            Options {
+                max_checkpoint_size: Some(2),
+                delay: 5,
+                ..Default::default()
+            },
+        ).enumerate().take(10) {
+            println!("{i}: {should_print}");
+        }
+    }
+}
