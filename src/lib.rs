@@ -80,8 +80,11 @@ pub mod prelude {
 /// Regular progress update observer.
 pub struct Observer {
     frequency_target: Duration,
+
     checkpoint_size: u64,
     max_checkpoint_size: Option<u64>,
+    delay: u64,
+
     next_checkpoint: u64,
     last_observation: Instant,
     ticks: u64,
@@ -98,11 +101,20 @@ pub struct Options {
     /// specified frequency target, *and* you actually care about the frequency of those first couple printouts.
     pub checkpoint_size: u64,
 
+    /// Specify a maximum number of ticks to wait for in between observations.
+    ///
     /// In some instances, such as during particularly chaotic computations, the observer
     /// could erroneously derive an exceedingly large size for the next potential checkpoint. In those situations,
     /// you might want to specify a maximum number of ticks between progress reports, so that
     /// the observer doesn't get stuck waiting indefinitely after a bad next checkpoint estimate.
     pub max_checkpoint_size: Option<u64>,
+
+    /// Delay observations for this many initial ticks.
+    ///
+    /// Sometimes your computation needs time to "warm up", where the first 1 or 2 iterations may take significantly
+    /// longer to process than all subsequent ones. This may throw off the checkpoint estimation. Specify this
+    /// argument to ignore the first n ticks processed, only beginning to record progress after they have elapsed.
+    pub delay: u64,
 }
 
 impl Default for Options {
@@ -110,6 +122,7 @@ impl Default for Options {
         Self {
             checkpoint_size: 1,
             max_checkpoint_size: None,
+            delay: 0,
         }
     }
 }
@@ -146,7 +159,7 @@ impl Observer {
     ///        primes += 1;
     ///    }
     ///    if should_print {
-    ///        println!("{primes} / {n} = {:.4}", (primes as f64) / (n as f64));
+    ///        println!("{primes} / {n} = {:.4}", primes as f64 / n as f64);
     ///    }
     /// }
     /// ```
@@ -155,12 +168,14 @@ impl Observer {
         Options {
             checkpoint_size,
             max_checkpoint_size,
+            delay,
         }: Options,
     ) -> Self {
         Self {
             frequency_target,
             checkpoint_size,
             max_checkpoint_size,
+            delay,
             next_checkpoint: checkpoint_size,
             last_observation: Instant::now(),
             ticks: 0,
@@ -196,7 +211,7 @@ impl Observer {
     ///        primes += 1;
     ///    }
     ///    if should_print {
-    ///        println!("{primes} / {n} = {:.4}", (primes as f64) / (n as f64));
+    ///        println!("{primes} / {n} = {:.4}", primes as f64 / n as f64);
     ///    }
     /// }
     /// ```
@@ -227,11 +242,21 @@ impl Observer {
     ///        primes += 1;
     ///    }
     ///    if observer.tick_n(1) {
-    ///        println!("{primes} / {n} = {:.4}", (primes as f64) / (n as f64));
+    ///        println!("{primes} / {n} = {:.4}", primes as f64 / n as f64);
     ///    }
     /// }
     /// ```
-    pub fn tick_n(&mut self, n: u64) -> bool {
+    pub fn tick_n(&mut self, mut n: u64) -> bool {
+        if self.delay > 0 {
+            let adjustment = n.min(self.delay);
+            self.delay -= adjustment;
+            n -= adjustment;
+            if self.delay > 0 {
+                return false;
+            } else {
+                self.last_observation = Instant::now();
+            }
+        }
         self.ticks += n;
         if self.ticks >= self.next_checkpoint {
             let observation_time = Instant::now();
@@ -276,7 +301,7 @@ impl Observer {
     ///        primes += 1;
     ///    }
     ///    if observer.tick() {
-    ///        println!("{primes} / {n} = {:.4}", (primes as f64) / (n as f64));
+    ///        println!("{primes} / {n} = {:.4}", primes as f64 / n as f64);
     ///    }
     /// }
     /// ```
