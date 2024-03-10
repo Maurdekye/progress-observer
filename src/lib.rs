@@ -279,9 +279,10 @@ impl Observer {
             let observation_time = Instant::now();
             let time_since_observation = observation_time.duration_since(self.last_observation);
             let checkpoint_ratio = time_since_observation.div_duration_f64(self.frequency_target);
-            self.checkpoint_size = (((self.checkpoint_size as f64) / checkpoint_ratio) as u64)
+            let checkpoint_size = self.checkpoint_size as f64;
+            self.checkpoint_size = ((checkpoint_size / checkpoint_ratio) as u64)
                 .max(1)
-                .min((self.checkpoint_size as f64 * self.max_scale_factor) as u64);
+                .min((checkpoint_size * self.max_scale_factor) as u64);
             if let Some(max_size) = self.max_checkpoint_size {
                 self.checkpoint_size = self.checkpoint_size.min(max_size);
             }
