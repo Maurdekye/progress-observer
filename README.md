@@ -10,7 +10,7 @@ implementation is extremely efficient, while still being able to give regular up
 If the execution time of individual steps is too chaotic, then the progress updates may become unpredictable and irregular.
 However, the observer's operation is largely resilient to even a moderate amount of irregularity in execution time.
 
-```
+```rs
 use std::time::Duration;
 use progress_observer::prelude::*;
 use rand::prelude::*;
@@ -38,7 +38,7 @@ for i in 1..n {
 println!("{}", pi(n, in_circle))
 ```
 
-```
+```rs
 use std::time::Duration;
 use progress_observer::prelude::*;
 use rand::prelude::*;
