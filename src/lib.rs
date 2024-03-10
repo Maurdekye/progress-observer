@@ -18,7 +18,7 @@
 //! // compute pi by generating random points within a square, and checking if they fall within a circle
 //!
 //! fn pi(total: u64, in_circle: u64) -> f64 {
-//!     ((total as f64) / (in_circle as f64)) * 4.0
+//!     in_circle as f64 / total as f64 * 4.0
 //! }
 //!
 //! let mut rng = thread_rng();
@@ -46,7 +46,7 @@
 //! // use the observer as an iterator
 //!
 //! fn pi(total: usize, in_circle: u64) -> f64 {
-//!     ((total as f64) / (in_circle as f64)) * 4.0
+//!     in_circle as f64 / total as f64 * 4.0
 //! }
 //!
 //! let mut rng = thread_rng();
