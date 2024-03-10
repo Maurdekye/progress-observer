@@ -72,7 +72,7 @@
 use std::time::{Duration, Instant};
 
 pub mod prelude {
-    pub use super::Observer;
+    pub use super::{Observer, Options};
 }
 
 /// Regular progress update observer.
@@ -85,58 +85,8 @@ pub struct Observer {
     ticks: u64,
 }
 
-impl Observer {
-    /// Create an `Observer` with a maximum checkpoint size.
-    ///
-    /// In some instances, such as during particularly chaotic computations, the observer
-    /// could erroneously derive an exceedingly large size for the next potential checkpoint. In those situations,
-    /// you might want to specify a maximum number of ticks between progress reports, so that
-    /// the observer doesn't get stuck waiting indefinitely after a bad next checkpoint estimate.
-    ///
-    /// ```
-    /// use std::time::Duration;
-    /// use std::iter::once;
-    /// use progress_observer::prelude::*;
-    ///
-    /// // compute the ratio of prime numbers between 1 and n
-    ///
-    /// fn is_prime(n: u64) -> bool {
-    ///     once(2)
-    ///         .chain((3..=((n as f32).sqrt() as u64)).step_by(2))
-    ///         .find(|i| n % i == 0)
-    ///         .is_none()
-    /// }
-    ///
-    /// let mut primes = 0;
-    /// for (n, should_print) in
-    ///     Observer::new_with_max_checkpoint_size(Duration::from_secs(1), 300_000)
-    ///     .take(10_000_000)
-    ///     .enumerate()
-    /// {
-    ///    if is_prime(n as u64) {
-    ///        primes += 1;
-    ///    }
-    ///    if should_print {
-    ///        println!("{primes} / {n} = {:.4}", (primes as f64) / (n as f64));
-    ///    }
-    /// }
-    /// ```
-    pub fn new_with_max_checkpoint_size(
-        frequency_target: Duration,
-        max_checkpoint_size: u64,
-    ) -> Self {
-        Self {
-            frequency_target,
-            checkpoint_size: 1,
-            max_checkpoint_size: Some(max_checkpoint_size),
-            next_checkpoint: 1,
-            last_observation: Instant::now(),
-            ticks: 0,
-        }
-    }
-
-    /// Create an `Observer` with a custom starting checkpoint size.
-    ///
+/// Optional parameters for creating a new progress observer.
+pub struct Options {
     /// The checkpoint size represents the number of ticks until the next progress update is emitted.
     ///
     /// It is adjusted automatically each printout based on the duration of the work performed, and thus it is
@@ -144,6 +94,28 @@ impl Observer {
     /// and the checkpoint size will adjust automatically within 1-3 prints to adapt to the workload you're performing.
     /// Specify only if you both have a strong estimate for how many iterations will pass within the timeframe of your
     /// specified frequency target, *and* you actually care about the frequency of those first couple printouts.
+    pub checkpoint_size: u64,
+
+    /// In some instances, such as during particularly chaotic computations, the observer
+    /// could erroneously derive an exceedingly large size for the next potential checkpoint. In those situations,
+    /// you might want to specify a maximum number of ticks between progress reports, so that
+    /// the observer doesn't get stuck waiting indefinitely after a bad next checkpoint estimate.
+    pub max_checkpoint_size: Option<u64>,
+}
+
+impl Default for Options {
+    fn default() -> Self {
+        Self {
+            checkpoint_size: 1,
+            max_checkpoint_size: None,
+        }
+    }
+}
+
+impl Observer {
+    /// Create an `Observer` with the specified options.
+    ///
+    /// See the [`Options`] struct for more details on the options that may be specified.
     ///
     /// ```
     /// use std::time::Duration;
@@ -161,7 +133,10 @@ impl Observer {
     ///
     /// let mut primes = 0;
     /// for (n, should_print) in
-    ///     Observer::new_with_checkpoint_size(Duration::from_secs(1), 500_000)
+    ///     Observer::new_with(Duration::from_secs(1), Options {
+    ///         max_checkpoint_size: Some(200_000),
+    ///         ..Options::default()
+    ///     })
     ///     .take(10_000_000)
     ///     .enumerate()
     /// {
@@ -173,18 +148,24 @@ impl Observer {
     ///    }
     /// }
     /// ```
-    pub fn new_with_checkpoint_size(frequency_target: Duration, checkpoint_size: u64) -> Self {
+    pub fn new_with(
+        frequency_target: Duration,
+        Options {
+            checkpoint_size,
+            max_checkpoint_size,
+        }: Options,
+    ) -> Self {
         Self {
             frequency_target,
             checkpoint_size,
-            max_checkpoint_size: None,
+            max_checkpoint_size,
             next_checkpoint: checkpoint_size,
             last_observation: Instant::now(),
             ticks: 0,
         }
     }
 
-    /// Create a new `Observer` with the specified frequency target.
+    /// Create a new `Observer` with the specified frequency target and default options.
     ///
     /// The observer will attempt to adjust its reports to match the specified target; if you
     /// specify 1 second, it will attempt to display progress updates in 1 second intervals.
@@ -218,7 +199,7 @@ impl Observer {
     /// }
     /// ```
     pub fn new(frequency_target: Duration) -> Self {
-        Self::new_with_checkpoint_size(frequency_target, 1)
+        Self::new_with(frequency_target, Options::default())
     }
 
     /// Tick the observer by n iterations at once.
