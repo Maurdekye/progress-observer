@@ -95,13 +95,12 @@ pub struct Observer {
 pub struct Options {
     /// Number of ticks before sending the first report.
     ///
-    /// Typically not necessary to set manually; the default starting checkpoint size of 1 should be sufficient for most workloads,
-    /// and the checkpoint size should adjust automatically within 1-3 prints to adapt to the workload you're performing.
-    /// In some cases, if the initial iterations have a moderately chaotic execution time, setting this value higher than 1
-    /// will prevent the first checkpoint estimate from being excessively large. If the reporter seems to fail to work
-    /// properly using the default settings, adjust this value up as a first fix.
-    /// Specify if you have a general estimate for how many iterations will pass within the timeframe of your
-    /// specified frequency target.
+    /// The default value of 1 is sometimes quite small, and in combination with the default max_scale_factor of 2,
+    /// it can take several dozen iterations before the typical checkpoint size settles to an appropriate value.
+    /// These unnecessary extra rapid prints can cause the beginning of your observed timeframe to be crowded with
+    /// the expensive syscalls and calculations that might be associated with your operation.
+    /// Setting this value to an approximate estimate of the number of iterations you expect to pass within
+    /// the time frame specified by your frequency target will prevent this frontloading of printouts.
     pub first_checkpoint: u64,
 
     /// Specify a maximum number of ticks to wait for in between observations.
@@ -197,6 +196,51 @@ impl Observer {
             last_observation: Instant::now(),
             ticks: 0,
         }
+    }
+
+    /// Create an `Observer` with a specified starting checkpoint.
+    ///
+    /// Setting just the starting checkpoint alone is often desirable, so this convenience
+    /// method is provided to allow setting it without having to specify a full `Options` struct.
+    ///
+    /// See the [`Options`] struct for more details on what values to set the starting checkpoint to.
+    ///
+    /// ```
+    /// use std::time::Duration;
+    /// use std::iter::once;
+    /// use progress_observer::prelude::*;
+    ///
+    /// // compute the ratio of prime numbers between 1 and n
+    ///
+    /// fn is_prime(n: u64) -> bool {
+    ///     once(2)
+    ///         .chain((3..=((n as f32).sqrt() as u64)).step_by(2))
+    ///         .find(|i| n % i == 0)
+    ///         .is_none()
+    /// }
+    ///
+    /// let mut primes = 0;
+    /// for (n, should_print) in
+    ///     Observer::new_starting_at(Duration::from_secs(1), 300_000)
+    ///     .take(10_000_000)
+    ///     .enumerate()
+    /// {
+    ///    if is_prime(n as u64) {
+    ///        primes += 1;
+    ///    }
+    ///    if should_print {
+    ///        println!("{primes} / {n} = {:.4}", primes as f64 / n as f64);
+    ///    }
+    /// }
+    /// ```
+    pub fn new_starting_at(frequency_target: Duration, first_checkpoint: u64) -> Self {
+        Self::new_with(
+            frequency_target,
+            Options {
+                first_checkpoint,
+                ..Default::default()
+            },
+        )
     }
 
     /// Create a new `Observer` with the specified frequency target and default options.
