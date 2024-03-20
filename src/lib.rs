@@ -12,7 +12,6 @@
 //!
 //! ```
 //! use std::time::Duration;
-//! use std::io::{stdout, Write};
 //! use progress_observer::prelude::*;
 //! use rand::prelude::*;
 //!
@@ -32,8 +31,7 @@
 //!         in_circle += 1;
 //!     }
 //!     if observer.tick() {
-//!         print!("\rpi = {}", pi(i, in_circle));
-//!         stdout().flush().unwrap();
+//!         reprint!("pi = {}", pi(i, in_circle));
 //!     }
 //! }
 //! println!("pi = {}", pi(n, in_circle))
@@ -64,8 +62,7 @@
 //!         in_circle += 1;
 //!     }
 //!     if should_print {
-//!         print!("\rpi = {}", pi(i, in_circle));
-//!         stdout().flush().unwrap();
+//!         reprint!("pi = {}", pi(i, in_circle));
 //!     }
 //! }
 //! println!("pi = {}", pi(n, in_circle))
@@ -74,7 +71,36 @@
 use std::time::{Duration, Instant};
 
 pub mod prelude {
-    pub use super::{Observer, Options};
+    pub use super::{reprint, Observer, Options};
+}
+
+/// Utility macro for re-printing over the same terminal line.
+/// Useful when used in tandem with a progress observer.
+///
+/// ```
+/// use progress_observer::prelude::*;
+/// use std::time::Duration;
+///
+/// // benchmark how many integers you can add per second
+///
+/// let mut count: u128 = 0;
+///
+/// for should_print in Observer::new(Duration::from_secs(1)).take(100_000_000) {
+///     count += 1;
+///     if should_print {
+///         reprint!("{count}");
+///         count = 0;
+///     }
+/// }
+/// ```
+#[macro_export]
+macro_rules! reprint {
+    ($($tk:tt)*) => {
+        {
+            print!("\r{}", format!($($tk)*));
+            ::std::io::Write::flush(&mut ::std::io::stdout()).unwrap();
+        }
+    };
 }
 
 /// Regular progress update observer.
@@ -85,10 +111,13 @@ pub struct Observer {
     max_checkpoint_size: Option<u64>,
     delay: u64,
     max_scale_factor: f64,
+    run_for: Option<Duration>,
 
     next_checkpoint: u64,
     last_observation: Instant,
+    first_observation: Instant,
     ticks: u64,
+    finished: bool,
 }
 
 /// Optional parameters for creating a new progress observer.
@@ -123,6 +152,12 @@ pub struct Options {
     /// Intended to prevent sudden large jumps in checkpoint size between reports. The default value of 2 is generally fine for most cases.
     /// Panics if the factor is set less than 1.
     pub max_scale_factor: f64,
+
+    /// Specify a maximum duration to run the observer for.
+    ///
+    /// After the duration has passed, the observer will return `None` from `Iterator::next`.
+    /// Setting this value has no effect if using `Observer::tick` directly.
+    pub run_for: Option<Duration>,
 }
 
 impl Default for Options {
@@ -132,6 +167,7 @@ impl Default for Options {
             max_checkpoint_size: None,
             delay: 0,
             max_scale_factor: 2.0,
+            run_for: None,
         }
     }
 }
@@ -179,6 +215,7 @@ impl Observer {
             max_checkpoint_size,
             delay,
             max_scale_factor,
+            run_for,
         }: Options,
     ) -> Self {
         if max_scale_factor < 1.0 {
@@ -191,10 +228,13 @@ impl Observer {
             max_checkpoint_size,
             delay,
             max_scale_factor,
+            run_for,
 
             next_checkpoint: checkpoint_size,
             last_observation: Instant::now(),
+            first_observation: Instant::now(),
             ticks: 0,
+            finished: false,
         }
     }
 
@@ -316,11 +356,17 @@ impl Observer {
                 return false;
             } else {
                 self.last_observation = Instant::now();
+                self.first_observation = Instant::now();
             }
         }
         self.ticks += n;
         if self.ticks >= self.next_checkpoint {
             let observation_time = Instant::now();
+            if self.run_for.is_some_and(|run_for| {
+                observation_time.duration_since(self.first_observation) > run_for
+            }) {
+                self.finished = true;
+            }
             let time_since_observation = observation_time.duration_since(self.last_observation);
             let checkpoint_ratio = time_since_observation.div_duration_f64(self.frequency_target);
             let checkpoint_size = self.checkpoint_size as f64;
@@ -377,13 +423,25 @@ impl Iterator for Observer {
     type Item = bool;
 
     fn next(&mut self) -> Option<Self::Item> {
-        Some(self.tick())
+        (!self.finished).then(|| self.tick())
     }
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn reprint() {
+        let mut count: u64 = 0;
+        for should_print in Observer::new(Duration::from_secs(1)).take(1_000_000_000) {
+            count += 1;
+            if should_print {
+                reprint!("{count: <20}");
+                count = 0;
+            }
+        }
+    }
 
     #[test]
     fn delay() {
@@ -399,6 +457,23 @@ mod tests {
         .take(10)
         {
             println!("{i}: {should_print}");
+        }
+    }
+
+    #[test]
+    fn run_for() {
+        for (i, should_print) in Observer::new_with(
+            Duration::from_secs_f32(0.1),
+            Options {
+                run_for: Some(Duration::from_secs(5)),
+                ..Default::default()
+            },
+        )
+        .enumerate()
+        {
+            if should_print {
+                reprint!("{i}");
+            }
         }
     }
 }
